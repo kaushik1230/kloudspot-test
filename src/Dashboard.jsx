@@ -11,7 +11,7 @@ import OccupancyChart from "./components/OccupancyChart";
 import DemographicsSection from "./components/DemographicsSection";
 import CrowdEntries from "./components/CrowdEntries";
 
-const API_BASE = "https://hiring-dev.internal.kloudspot.com/api";
+const API_BASE = "/api";
 const SOCKET_URL = "https://hiring-dev.internal.kloudspot.com";
 
 const Dashboard = () => {
@@ -276,7 +276,7 @@ const Dashboard = () => {
           activeTab={activeTab} 
           setActiveTab={(tab) => { setActiveTab(tab); if(isMobile) setIsCollapsed(true); }} 
           onLogout={handleLogout}
-          // On mobile, if the menu is visible, it should look "expanded" (text visible)
+        
           isCollapsed={isMobile ? false : isCollapsed} 
           toggleSidebar={() => setIsCollapsed(!isCollapsed)}
         />
@@ -285,8 +285,8 @@ const Dashboard = () => {
       
       <div className={`flex-1 transition-all duration-300 min-h-screen flex flex-col
         ${isMobile 
-          ? 'ml-0 w-full'  // Mobile: Full width, no margin
-          : (isCollapsed ? 'ml-20' : 'ml-64') // Desktop: Margin to match sidebar width
+          ? 'ml-0 w-full' 
+          : (isCollapsed ? 'ml-20' : 'ml-64') 
         }
       `}>
         
