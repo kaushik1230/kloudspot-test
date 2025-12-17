@@ -6,13 +6,13 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(),tailwindcss()],
   
-  server: {
-    proxy: {
-      '/api': {
-        target: 'https://hiring-dev.internal.kloudspot.com', // The backend URL
-        changeOrigin: true, // Needed for virtual hosted sites
-        secure: false,      // Ignore SSL issues if any
-      }
-    }
-  }
+  // server: {
+  //   proxy: {
+  //     '/api': {
+  //       target: 'https://hiring-dev.internal.kloudspot.com', // The backend URL
+  //       changeOrigin: true, // Needed for virtual hosted sites
+  //       secure: false,      // Ignore SSL issues if any
+  //     }
+  //   }
+  // }
 })

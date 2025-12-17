@@ -11,7 +11,7 @@ import OccupancyChart from "./components/OccupancyChart";
 import DemographicsSection from "./components/DemographicsSection";
 import CrowdEntries from "./components/CrowdEntries";
 
-const API_BASE = "/api";
+const API_BASE = "https://hiring-dev.internal.kloudspot.com/api";
 const SOCKET_URL = "https://hiring-dev.internal.kloudspot.com";
 
 const Dashboard = () => {
