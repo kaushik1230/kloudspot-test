@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { FiMenu } from "react-icons/fi"; 
 import Sidebar from "./Sidebar";
 import Header from "./Header";
@@ -27,10 +28,11 @@ const DashboardLayout = ({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [isMobile]);
-
+  
+  const navigate = useNavigate();
   const handleLogout = () => {
     localStorage.removeItem("token");
-    window.location.href = "/login";
+    navigate('/')
   };
 
   return (
@@ -39,7 +41,7 @@ const DashboardLayout = ({
       
       {isMobile && !isCollapsed && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40" 
+          className="fixed inset-0  bg-opacity-50 z-40" 
           onClick={() => setIsCollapsed(true)} 
         />
       )}
