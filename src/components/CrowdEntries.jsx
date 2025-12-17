@@ -41,7 +41,6 @@ const CrowdEntries = ({ siteId }) => {
         
         if (response.ok) {
             const data = await response.json();
-            console.log(data);
             
             const records = data.records || [];
       
@@ -84,7 +83,7 @@ const CrowdEntries = ({ siteId }) => {
       <EntriesTable entries={entries} loading={loading} />
       
       <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
-      
+
     </div>
   );
 };

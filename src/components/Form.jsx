@@ -38,7 +38,7 @@ const Form = () => {
 
             if (response.status === 200) {
                 const data = await response.json();
-                console.log("Login Successful!", data);
+                // console.log("Login Successful!", data);
 
                 if (data.token) {
                     const token = data.token;
