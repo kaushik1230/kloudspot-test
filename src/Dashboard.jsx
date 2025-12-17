@@ -17,17 +17,18 @@ const SOCKET_URL = "https://hiring-dev.internal.kloudspot.com";
 const Dashboard = () => {
   const navigate = useNavigate();
 
+ 
   const [activeTab, setActiveTab] = useState("overview");
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [alerts, setAlerts] = useState([]);
   const [sites, setSites] = useState([]);
   const [selectedSite, setSelectedSite] = useState(null);
+  const [alerts, setAlerts] = useState([]);
 
   
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  
   const [isCollapsed, setIsCollapsed] = useState(window.innerWidth < 768);
 
+ 
   const [stats, setStats] = useState({
     occupancy: 0, occupancyTrend: "--", occupancyPos: true,
     footfall: 0, footfallTrend: "--", footfallPos: true,
@@ -46,25 +47,24 @@ const Dashboard = () => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
-      
       if (mobile && !isMobile) setIsCollapsed(true);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [isMobile]);
 
-  
-   const getLast24HoursUtc = () => {
+ 
+  const getLast24HoursUtc = () => {
     const end = new Date();
     const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
-    return { fromUtc: start.getTime(), toUtc: end.getTime() };
+    return { fromUtc: Math.floor(start.getTime()), toUtc: Math.floor(end.getTime()) };
   };
 
   const getPrev24HoursUtc = () => {
     const end = new Date();
     const startOfPrev = new Date(end.getTime() - 48 * 60 * 60 * 1000);
     const endOfPrev = new Date(end.getTime() - 24 * 60 * 60 * 1000);
-    return { fromUtc: startOfPrev.getTime(), toUtc: endOfPrev.getTime() };
+    return { fromUtc: Math.floor(startOfPrev.getTime()), toUtc: Math.floor(endOfPrev.getTime()) };
   };
 
   const getYesterdaySameTimeUtc = () => {
@@ -72,7 +72,7 @@ const Dashboard = () => {
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const start = new Date(yesterday.getTime() - 10 * 60 * 1000);
     const end = new Date(yesterday.getTime() + 10 * 60 * 1000);
-    return { fromUtc: start.getTime(), toUtc: end.getTime() };
+    return { fromUtc: Math.floor(start.getTime()), toUtc: Math.floor(end.getTime()) };
   };
 
   function transformName(str) {
@@ -87,18 +87,30 @@ const Dashboard = () => {
     return words.slice(0, -2).join(" ");
   }
 
+  
   const calculateTrend = (current, previous) => {
-    if (!previous || previous === 0) {
-      if (!current || current === 0) return { label: "0%", isPositive: true };
+   
+    if (previous === undefined || previous === null || isNaN(previous)) {
+        return { label: "--", isPositive: true };
+    }
+
+   
+    if (previous === 0) {
+      if (current === 0) return { label: "0%", isPositive: true };
       return { label: "+100%", isPositive: true };
     }
+
+   
     const diff = current - previous;
     const percentage = (diff / previous) * 100;
-    const label = `${percentage > 0 ? "+" : ""}${Math.round(percentage)}%`;
-    return { label, isPositive: percentage >= 0 };
+    const rounded = Math.round(percentage); // STRICT INTEGER
+
+    const label = `${rounded > 0 ? "+" : ""}${rounded}%`;
+
+    return { label, isPositive: rounded >= 0 };
   };
 
-
+ 
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { navigate("/login"); return; }
@@ -135,62 +147,88 @@ const Dashboard = () => {
           setSites(data);
           if (data.length > 0) setSelectedSite(data[0]);
         }
-      } catch (e) { console.error("Network error fetching sites:", e); }
+      } catch (e) { console.error("Error fetching sites:", e); }
     };
 
     fetchSites();
     return () => socket.disconnect();
   }, [navigate]);
 
+ 
   useEffect(() => {
     if (!selectedSite) return;
+
+    let active = true; 
+
+   
+    setStats(prev => ({
+        ...prev,
+        occupancyTrend: "--", 
+        footfallTrend: "--", 
+        dwellTrend: "--"
+    }));
+    setOccupancyData([]); 
+    setDemographicsTrend([]);
 
     const fetchAnalytics = async () => {
       const token = localStorage.getItem("token");
       const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 
       const post = async (ep, range) => {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); 
-
         try {
           const res = await fetch(`${API_BASE}/analytics/${ep}`, {
             method: "POST",
             headers,
             body: JSON.stringify({ siteId: selectedSite.siteId, ...range }),
-            signal: controller.signal,
           });
-          clearTimeout(timeoutId);
-          if (!res.ok) return {};
+          if (!res.ok) return null; 
           return await res.json();
-        } catch (e) { return {}; }
+        } catch (e) { return null; }
       };
 
       const currRange = getLast24HoursUtc();
       const prevRange = getPrev24HoursUtc();
       const snapshotRange = getYesterdaySameTimeUtc();
 
-      const [dwellCurr, footfallCurr, occCurr, demoCurr] = await Promise.all([
+     
+      const currentPromise = Promise.all([
         post("dwell", currRange),
         post("footfall", currRange),
         post("occupancy", currRange),
         post("demographics", currRange),
       ]);
 
-      const lastOccBucket = (occCurr.buckets && occCurr.buckets.length > 0) 
+     
+      const historyPromise = Promise.all([
+        post("occupancy", snapshotRange),
+        post("dwell", prevRange),
+        post("footfall", prevRange),
+      ]);
+
+      
+      const [dwellCurr, footfallCurr, occCurr, demoCurr] = await currentPromise;
+
+      if (!active) return; 
+
+      const lastOccBucket = (occCurr?.buckets && occCurr.buckets.length > 0) 
         ? occCurr.buckets[occCurr.buckets.length - 1] 
         : null;
       
       const lastOccValue = lastOccBucket ? (lastOccBucket.avg || lastOccBucket.count || 0) : 0;
+      const currentDwell = dwellCurr?.avgDwellMinutes || 0;
+      const currentFootfall = footfallCurr?.footfall || 0;
+      
+      const liveOccupancy = stats.occupancy > 0 ? stats.occupancy : Math.round(lastOccValue);
 
       setStats((prev) => ({
         ...prev,
-        dwellTime: dwellCurr.avgDwellMinutes ? `${Math.round(dwellCurr.avgDwellMinutes)} min` : "0 min",
-        footfall: footfallCurr.footfall || 0,
-        occupancy: prev.occupancy > 0 ? prev.occupancy : Math.round(lastOccValue),
+        dwellTime: currentDwell ? `${Math.round(currentDwell)} min` : "0 min",
+        footfall: currentFootfall,
+        occupancy: liveOccupancy,
       }));
 
-      const rawOcc = Array.isArray(occCurr) ? occCurr : occCurr.buckets || [];
+    
+      const rawOcc = Array.isArray(occCurr) ? occCurr : occCurr?.buckets || [];
       setOccupancyData(
         rawOcc.map((b) => ({
           time: new Date(b.timestamp || b.utc || b.fromUtc).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -198,7 +236,7 @@ const Dashboard = () => {
         }))
       );
 
-      const rawDemo = Array.isArray(demoCurr) ? demoCurr : demoCurr.buckets || [];
+      const rawDemo = Array.isArray(demoCurr) ? demoCurr : demoCurr?.buckets || [];
       setDemographicsTrend(
         rawDemo.map((b) => ({
           time: new Date(b.timestamp || b.utc || b.fromUtc).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -217,24 +255,30 @@ const Dashboard = () => {
         ]);
       }
 
-      const [occYesterdaySnapshot, dwellPrev, footfallPrev] = await Promise.all([
-        post("occupancy", snapshotRange),
-        post("dwell", prevRange),
-        post("footfall", prevRange),
-      ]);
+     
+      const [occYesterdaySnapshot, dwellPrev, footfallPrev] = await historyPromise;
+
+      if (!active) return; 
+
+      
+      console.log(` ${selectedSite.name}`);
+      console.log("Footfall (Today vs Yesterday):", currentFootfall, "vs", footfallPrev?.footfall);
+      console.log("Dwell (Today vs Yesterday):", currentDwell, "vs", dwellPrev?.avgDwellMinutes);
 
       const getAvgFromSnapshot = (data) => {
-        const buckets = Array.isArray(data) ? data : data.buckets || [];
+        const buckets = Array.isArray(data) ? data : data?.buckets || [];
         if (buckets.length === 0) return 0;
         return buckets.reduce((acc, b) => acc + (b.avg || b.count || 0), 0) / buckets.length;
       };
 
-      const liveValue = stats.occupancy > 0 ? stats.occupancy : lastOccValue;
-      const yesterdayValue = getAvgFromSnapshot(occYesterdaySnapshot);
-      const occTrend = calculateTrend(liveValue, yesterdayValue);
+     
+      const prevDwellVal = dwellPrev?.avgDwellMinutes; 
+      const prevFootfallVal = footfallPrev?.footfall;
+      const prevOccupancyVal = getAvgFromSnapshot(occYesterdaySnapshot);
 
-      const dwellTrend = calculateTrend(dwellCurr.avgDwellMinutes || 0, dwellPrev.avgDwellMinutes || 0);
-      const footfallTrend = calculateTrend(footfallCurr.footfall || 0, footfallPrev.footfall || 0);
+      const occTrend = calculateTrend(liveOccupancy, prevOccupancyVal);
+      const dwellTrend = calculateTrend(currentDwell, prevDwellVal);
+      const footfallTrend = calculateTrend(currentFootfall, prevFootfallVal);
 
       setStats((prev) => ({
         ...prev,
@@ -245,7 +289,9 @@ const Dashboard = () => {
     };
 
     fetchAnalytics();
-  }, [selectedSite]); 
+
+    return () => { active = false; };
+  }, [selectedSite, activeTab]); 
 
   const handleLogout = async () => {
     localStorage.removeItem("token");
@@ -255,20 +301,16 @@ const Dashboard = () => {
   return (
     <div className="flex bg-gray-50 min-h-screen font-sans relative overflow-x-hidden">
       
-      
       {isMobile && !isCollapsed && (
         <div 
-          className="fixed inset-0  bg-opacity-50 z-40" 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40" 
           onClick={() => setIsCollapsed(true)} 
         />
       )}
 
-     
       <div className={`fixed top-0 left-0 h-full z-50 transition-all duration-300 transform 
         ${isMobile 
-          
           ? (isCollapsed ? '-translate-x-full' : 'translate-x-0 w-64') 
-          
           : (isCollapsed ? 'w-20' : 'w-64')
         }
       `}>
@@ -276,13 +318,11 @@ const Dashboard = () => {
           activeTab={activeTab} 
           setActiveTab={(tab) => { setActiveTab(tab); if(isMobile) setIsCollapsed(true); }} 
           onLogout={handleLogout}
-        
           isCollapsed={isMobile ? false : isCollapsed} 
           toggleSidebar={() => setIsCollapsed(!isCollapsed)}
         />
       </div>
 
-      
       <div className={`flex-1 transition-all duration-300 min-h-screen flex flex-col
         ${isMobile 
           ? 'ml-0 w-full' 
@@ -290,14 +330,13 @@ const Dashboard = () => {
         }
       `}>
         
-        
         {isMobile && (
           <div className="bg-white p-4 border-b flex items-center justify-between sticky top-0 z-30 shadow-sm">
              <button onClick={() => setIsCollapsed(false)} className="text-gray-600 focus:outline-none p-2 rounded hover:bg-gray-100">
                 <FiMenu size={24} />
              </button>
              <span className="font-bold text-lg text-gray-800">Kloudspot</span>
-             <div className="w-8"></div> {/* Spacer to center title */}
+             <div className="w-8"></div>
           </div>
         )}
 
