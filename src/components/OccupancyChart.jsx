@@ -2,14 +2,14 @@ import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const OccupancyChart = ({ data }) => {
-  // Guard clause: prevent rendering if data is missing
+  
   if (!data) return null;
 
   return (
     
     <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-100 mt-6">
       <div className="flex justify-between items-center mb-4">
-        {/* Responsive Font: text-sm on mobile, text-base (default) on desktop */}
+      
         <h3 className="font-bold text-gray-800 text-sm md:text-base">Overall Occupancy</h3>
         <span className="text-xs font-semibold text-teal-600 bg-teal-50 px-2 py-1 rounded">
           Live
