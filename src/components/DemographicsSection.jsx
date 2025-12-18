@@ -55,7 +55,7 @@ const DemographicsSection = ({ pieData, trendData }) => {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={trendData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-              <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} dy={10} />
+              <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9ca3af' }} dy={10} minTickGap={30}/>
               <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
               <Legend verticalAlign="top" height={36} iconType="circle" />
               

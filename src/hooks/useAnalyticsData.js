@@ -19,13 +19,11 @@ const calculateTrend = (current, previous) => {
   return { label, isPositive: rounded >= 0 };
 };
 
-
 export const useAnalyticsData = (apiBase, selectedSite) => {
   const [stats, setStats] = useState({
-    // Store raw values here, not just formatted strings
     footfall: 0, footfallTrend: "--", footfallPos: true,
     dwellTime: "0 min", dwellTrend: "--", dwellPos: true,
-    historicalOccupancy: 0, // Store yesterday's occupancy here
+    historicalOccupancy: 0, 
   });
   
   const [occupancyData, setOccupancyData] = useState([]);
@@ -35,15 +33,15 @@ export const useAnalyticsData = (apiBase, selectedSite) => {
     { name: "Female", value: 0, color: "#99f6e4" },
   ]);
 
+  
   useEffect(() => {
     if (!selectedSite) return;
     let active = true;
 
-    
-    setOccupancyData([]); 
+   
     setDemographicsTrend([]);
 
-    const fetchAnalytics = async () => {
+    const fetchInitialStats = async () => {
       const token = localStorage.getItem("token");
       const post = async (ep, range) => {
         try {
@@ -60,26 +58,15 @@ export const useAnalyticsData = (apiBase, selectedSite) => {
       const prevRange = getUtcRange(48, 24); 
       const snapshotRange = getUtcRange(24.1, 23.9); 
 
-      
-      const [dwellCurr, footfallCurr, occCurr, demoCurr] = await Promise.all([
+      const [dwellCurr, footfallCurr, demoCurr] = await Promise.all([
         post("dwell", currRange),
         post("footfall", currRange),
-        post("occupancy", currRange),
         post("demographics", currRange),
       ]);
 
       if (!active) return;
 
-      const currentDwell = dwellCurr?.avgDwellMinutes || 0;
-      const currentFootfall = footfallCurr?.footfall || 0;
       
-     
-      const occBuckets = occCurr?.buckets || [];
-      setOccupancyData(occBuckets.map(b => ({
-          time: new Date(b.timestamp || b.utc || b.fromUtc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          count: b.avg || b.count || 0
-      })));
-
       const demoBuckets = demoCurr?.buckets || [];
       setDemographicsTrend(demoBuckets.map(b => ({
           time: new Date(b.timestamp || b.utc || b.fromUtc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -94,7 +81,7 @@ export const useAnalyticsData = (apiBase, selectedSite) => {
         setDemographicsPie([{ name: "Male", value: mPct, color: "#14b8a6" }, { name: "Female", value: 100 - mPct, color: "#99f6e4" }]);
       }
 
-      
+     
       const [occSnap, dwellPrev, footfallPrev] = await Promise.all([
         post("occupancy", snapshotRange),
         post("dwell", prevRange),
@@ -103,9 +90,10 @@ export const useAnalyticsData = (apiBase, selectedSite) => {
 
       if (!active) return;
 
+      const currentDwell = dwellCurr?.avgDwellMinutes || 0;
+      const currentFootfall = footfallCurr?.footfall || 0;
       const getAvg = (d) => (d?.buckets || []).reduce((acc, b) => acc + (b.avg || b.count || 0), 0) / (d?.buckets?.length || 1);
-      const histOcc = getAvg(occSnap); // Yesterday's average occupancy
-
+      
       const dwellTrend = calculateTrend(currentDwell, dwellPrev?.avgDwellMinutes);
       const footfallTrend = calculateTrend(currentFootfall, footfallPrev?.footfall);
 
@@ -114,13 +102,61 @@ export const useAnalyticsData = (apiBase, selectedSite) => {
         footfall: currentFootfall,
         dwellTrend: dwellTrend.label, dwellPos: dwellTrend.isPositive,
         footfallTrend: footfallTrend.label, footfallPos: footfallTrend.isPositive,
-        historicalOccupancy: histOcc // Passing this up so Composer can compare with Live
+        historicalOccupancy: getAvg(occSnap) 
       });
     };
 
-    fetchAnalytics();
+    fetchInitialStats();
     return () => { active = false; };
-  }, [selectedSite, apiBase]); 
+  }, [selectedSite, apiBase]);
+
+
+  
+  useEffect(() => {
+    if (!selectedSite) return;
+    let active = true;
+
+    
+    setOccupancyData([]);
+
+    const fetchOccupancyChart = async () => {
+      const token = localStorage.getItem("token");
+      const currRange = getUtcRange(24, 0); 
+      
+      try {
+        const res = await fetch(`${apiBase}/analytics/occupancy`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ siteId: selectedSite.siteId, ...currRange }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        console.log(data);
+        if (!active) return;
+
+        const occBuckets = data?.buckets || [];
+        setOccupancyData(occBuckets.map(b => ({
+            time: new Date(b.timestamp || b.utc || b.fromUtc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            count: b.avg || b.count || 0
+        })));
+      } catch (e) { console.error("Polling Error:", e); }
+    };
+
+   
+    fetchOccupancyChart();
+
+    
+    const intervalId = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+            fetchOccupancyChart();
+        }
+    }, 60000);
+
+    return () => { 
+        active = false; 
+        clearInterval(intervalId); 
+    };
+  }, [selectedSite, apiBase]);
 
   return { stats, occupancyData, demographicsTrend, demographicsPie };
 };
