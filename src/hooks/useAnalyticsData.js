@@ -131,7 +131,7 @@ export const useAnalyticsData = (apiBase, selectedSite) => {
         });
         if (!res.ok) return;
         const data = await res.json();
-        console.log(data);
+       
         if (!active) return;
 
         const occBuckets = data?.buckets || [];
